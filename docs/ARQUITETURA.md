@@ -296,6 +296,7 @@ Prefixo `/api`. Todos exigem JWT, exceto os marcados com 🔓. Listagens são pa
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
+| GET | `/sessions/start-options` | Tela Treinar: sessão em andamento ou dias da fase atual (adicionado na Etapa 4) |
 | POST | `/sessions` | Inicia sessão (`workoutDayId`, `weekId`, ou avulsa) |
 | GET | `/sessions/current` | Sessão em andamento (recuperação) |
 | GET | `/sessions?from=&to=&page=` | Histórico |
@@ -303,7 +304,7 @@ Prefixo `/api`. Todos exigem JWT, exceto os marcados com 🔓. Listagens são pa
 | POST | `/sessions/{id}/finish` | Finaliza (mesmo incompleta) |
 | DELETE | `/sessions/{id}` | Descarta sessão (com confirmação) |
 | POST | `/sessions/{id}/exercises` | Adiciona exercício extra |
-| POST | `/session-exercises/{id}/skip` | Pula exercício |
+| POST | `/session-exercises/{id}/skip` / `unskip` | Pula exercício / desfaz |
 | POST | `/session-exercises/{id}/substitute` | Substitui exercício |
 | PATCH | `/session-exercises/{id}` | Observações / ordem |
 | POST | `/session-exercises/{id}/sets` | Registra série |
@@ -464,7 +465,7 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | **1 — Fundação** ✅ | Projetos, Docker, Flyway, Swagger, tema escuro | Build, lint, contexto |
 | **2 — Usuários e segurança** ✅ | IDs UUID; refresh token com rotação; logout; recuperação e troca de senha (Mailpit); perfil e configurações (unidades, tema); exclusão de conta; `CurrentUser` e base de isolamento; Testcontainers | Autenticação, rotação/reuso de refresh, isolamento |
 | **3 — Catálogo e planejamento** ✅ | Seed de exercícios; exercícios personalizados; planos, fases, semanas, dias, exercícios planejados; reordenar, substituir e duplicar; telas de planejamento | Criação, duplicação, isolamento |
-| **4 — Execução** | Sessões com snapshot; registro de séries (tipos e status); pular/substituir; observações; cronômetro; recuperação de sessão; fila offline; tela mobile | Início/fim, séries, sessão incompleta, recuperação |
+| **4 — Execução** ✅ | Sessões com snapshot; registro de séries (tipos e status); pular/substituir; observações; cronômetro; recuperação de sessão; fila offline; tela mobile | Início/fim, séries, sessão incompleta, recuperação |
 | **5 — Evolução e progressão** | Histórico por exercício; gráficos; volume por grupo muscular; análise de progressão com regras configuráveis | Cálculo de volume e de progressão (casos de borda) |
 | **6 — Avaliação física** | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
 | **7 — Relatórios** | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
@@ -480,6 +481,18 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 - Foi adicionado `GET /days/{id}`, usado pela tela de configuração do dia.
 - A regra de progressão por exercício (`/exercises/{id}/progression-rule`) ficou para a Etapa 5, junto com a análise que a usa.
 - Navegação inferior por enquanto: **Início · Mais**. Histórico, Treinar e Avaliação entram nas etapas 4 a 6.
+
+**Decisões de implementação da Etapa 4** (sem mudar nenhuma das ambiguidades A1–A14):
+
+- A sessão copia do plano o nome do plano, da fase e do dia, o número da semana, se é deload, e, por exercício, nome, equipamento, séries, faixa de reps, descanso, RIR e carga de referência. As referências ao plano usam `ON DELETE SET NULL` só na coluna do plano (PostgreSQL 15+), preservando o `user_id` da FK composta.
+- Sem `weekId`, a semana é escolhida pela data de hoje no fuso do usuário (preferência do perfil), quando a fase tem data de início.
+- Status do exercício: PENDING/PARTIAL/DONE são calculados pelas séries válidas concluídas (trabalho e adicionais); drop set e rest-pause ficam presos à série principal e não contam como séries extras (A13); aquecimento e ativação não contam. Registrar uma série desfaz o "pular"; "substituído" é definitivo (o novo exercício entra logo depois com a mesma configuração).
+- Exercício que ficou sem séries numa sessão finalizada aparece como "não feito"; nenhuma série é criada automaticamente (ausência de registro ≠ série feita).
+- **Fila offline (A11):** cada série leva um `clientId` gerado no aparelho; reenviar o mesmo `clientId` devolve o registro existente. O app guarda a fila no navegador e reenvia quando a API volta (evento `online` e nova tentativa a cada 20 s). Ela cobre queda de rede com o app aberto; reabrir o app sem internet depende do modo offline completo (PWA), previsto para a Etapa 8.
+- Os endpoints de série devolvem o exercício inteiro atualizado (séries e status), para a tela se atualizar com uma resposta só.
+- Cronômetro de descanso no app: guarda o horário de término, então sobrevive a recarregar a página; som (opcional, pela preferência) e vibração ao terminar.
+- Observações: região e lado do corpo só para dor/desconforto (regra no backend e `CHECK` no banco); observação geral exige texto. Elas podem ser da sessão, de um exercício da sessão ou avulsas.
+- Navegação inferior: **Início · Histórico · Treinar · Mais**. Avaliação física entra na Etapa 6.
 
 **Dependências novas propostas** (todas compatíveis com Java 17):
 

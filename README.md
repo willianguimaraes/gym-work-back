@@ -50,7 +50,7 @@ O `docker-compose.yml` sobe o PostgreSQL em `localhost:5432` (banco, usuário e 
 ./mvnw test
 ```
 
-- **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha, conta, catálogo e planejamento (ativação, semanas, reordenação).
+- **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha, conta, catálogo, planejamento (ativação, semanas, reordenação) e execução (status do exercício, tipos de série).
 - **Controller** (`@WebMvcTest`): validação, códigos HTTP e cookies.
 - **Integração** (Testcontainers + PostgreSQL 17): fluxos completos contra banco real, incluindo o isolamento entre usuários em todos os endpoints de planejamento e a FK composta que impede, no banco, um registro filho apontar para o pai de outro usuário. **Precisam do Docker rodando**; sem Docker eles são pulados (aparecem como *skipped*).
 
@@ -111,6 +111,19 @@ Lista completa em [`.env.example`](.env.example).
 | PUT | `/api/days/{id}/exercises/order` | JWT | Reordena os exercícios |
 | PUT / DELETE | `/api/planned-exercises/{id}` | JWT | Edita séries, reps, descanso, carga, RIR / remove |
 | POST | `/api/planned-exercises/{id}/replace` | JWT | Substitui o exercício mantendo a configuração |
+| GET | `/api/sessions/start-options?phaseId=` | JWT | Tela Treinar: sessão em andamento ou dias da fase atual, semana de hoje |
+| POST | `/api/sessions` | JWT | Inicia sessão a partir de um dia (copia o plano) ou avulsa; 409 se já houver uma em andamento |
+| GET | `/api/sessions/current` | JWT | Sessão em andamento (204 se não houver) |
+| GET | `/api/sessions?from=&to=&page=&size=` | JWT | Histórico paginado |
+| GET / PATCH / DELETE | `/api/sessions/{id}` | JWT | Detalhe (séries, última execução, observações) / observações gerais / descarta |
+| POST | `/api/sessions/{id}/finish` | JWT | Finaliza, mesmo incompleta |
+| POST | `/api/sessions/{id}/exercises` | JWT | Exercício extra |
+| POST | `/api/session-exercises/{id}/skip`, `/unskip`, `/substitute` | JWT | Pular, desfazer, substituir |
+| PATCH | `/api/session-exercises/{id}` | JWT | Nota do exercício |
+| POST | `/api/session-exercises/{id}/sets` | JWT | Registra série (idempotente por `clientId`) |
+| PUT / DELETE | `/api/sets/{id}` | JWT | Corrige / remove série |
+| GET / POST | `/api/observations` | JWT | Observações (dor, desconforto, sono, energia…) |
+| PUT / DELETE | `/api/observations/{id}` | JWT | Edita / remove observação |
 
 Recursos de outro usuário respondem **404** (nunca 403), para não revelar que o ID existe. Cargas são sempre em kg.
 

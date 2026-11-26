@@ -95,6 +95,13 @@ public class ExerciseService {
         return exercise;
     }
 
+    /** Exercício global ou do usuário (ativo ou não), referenciado num campo da requisição. */
+    @Transactional(readOnly = true)
+    public Exercise requireVisible(UUID userId, UUID exerciseId, String field) {
+        return exerciseRepository.findVisible(exerciseId, userId)
+                .orElseThrow(() -> new InvalidFieldException(field, NOT_FOUND));
+    }
+
     private void apply(UUID userId, Exercise exercise, ExerciseRequest request) {
         String name = request.name().trim().replaceAll("\\s+", " ");
         boolean duplicated = exerciseRepository.findSameName(userId, name, request.equipment()).stream()
