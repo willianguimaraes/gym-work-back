@@ -50,7 +50,7 @@ O `docker-compose.yml` sobe o PostgreSQL em `localhost:5432` (banco, usuário e 
 ./mvnw test
 ```
 
-- **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha, conta, catálogo, planejamento (ativação, semanas, reordenação) e execução (status do exercício, tipos de série).
+- **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha, conta, catálogo, planejamento (ativação, semanas, reordenação) execução (status do exercício, tipos de série) e análise de progressão (casos de borda: teto em uma série só, aquecimento, incompleto, dor, RIR, deload, regra configurável).
 - **Controller** (`@WebMvcTest`): validação, códigos HTTP e cookies.
 - **Integração** (Testcontainers + PostgreSQL 17): fluxos completos contra banco real, incluindo o isolamento entre usuários em todos os endpoints de planejamento e a FK composta que impede, no banco, um registro filho apontar para o pai de outro usuário. **Precisam do Docker rodando**; sem Docker eles são pulados (aparecem como *skipped*).
 
@@ -122,6 +122,12 @@ Lista completa em [`.env.example`](.env.example).
 | PATCH | `/api/session-exercises/{id}` | JWT | Nota do exercício |
 | POST | `/api/session-exercises/{id}/sets` | JWT | Registra série (idempotente por `clientId`) |
 | PUT / DELETE | `/api/sets/{id}` | JWT | Corrige / remove série |
+| GET | `/api/exercises/{id}/history?page=&size=` | JWT | Execuções do exercício (resumo "45 kg — 8/7/6", séries, volume) |
+| GET | `/api/exercises/{id}/summary` | JWT | Última execução, melhor série, 1RM estimado, análise, regra e observações |
+| GET | `/api/exercises/{id}/progress?groupBy=SESSION\|WEEK\|PHASE` | JWT | Dados do gráfico de carga e reps |
+| GET / PUT / DELETE | `/api/exercises/{id}/progression-rule` | JWT | Regra de progressão do exercício (DELETE volta ao padrão) |
+| GET | `/api/progression?phaseId=&weeks=` | JWT | Análise de progressão de todos os exercícios |
+| GET | `/api/progression/volume?weeks=` | JWT | Séries por grupo muscular e frequência semanal |
 | GET / POST | `/api/observations` | JWT | Observações (dor, desconforto, sono, energia…) |
 | PUT / DELETE | `/api/observations/{id}` | JWT | Edita / remove observação |
 

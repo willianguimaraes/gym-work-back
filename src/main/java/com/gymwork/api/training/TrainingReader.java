@@ -102,6 +102,12 @@ public class TrainingReader {
                 .or(() -> phases.stream().findFirst());
     }
 
+    /** Fase do usuário (404 se não for dele). */
+    @Transactional(readOnly = true)
+    public PhaseRef phase(UUID userId, UUID phaseId) {
+        return phaseRef(lookup.phase(userId, phaseId));
+    }
+
     @Transactional(readOnly = true)
     public List<DayRef> days(UUID userId, UUID phaseId) {
         List<WorkoutDay> days = dayRepository.findByPhase(phaseId, userId);

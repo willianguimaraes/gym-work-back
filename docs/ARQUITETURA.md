@@ -318,8 +318,10 @@ Prefixo `/api`. Todos exigem JWT, exceto os marcados com 🔓. Listagens são pa
 | --- | --- | --- |
 | GET | `/exercises/{id}/history?page=` | Histórico por sessão |
 | GET | `/exercises/{id}/summary` | Última carga/reps, melhor desempenho |
-| GET | `/exercises/{id}/progress?groupBy=week\|phase` | Dados do gráfico |
-| GET | `/progression?phaseId=` | Exercícios em progresso, estáveis e em queda, com sugestão |
+| GET | `/exercises/{id}/progress?groupBy=SESSION\|WEEK\|PHASE` | Dados do gráfico |
+| GET | `/progression?phaseId=&weeks=` | Exercícios em progresso, estáveis e em queda, com sugestão |
+| GET | `/progression/volume?weeks=` | Séries por grupo muscular e frequência por semana (adicionado na Etapa 5) |
+| GET / PUT / DELETE | `/exercises/{id}/progression-rule` | Regra de progressão (DELETE volta ao padrão) |
 | GET | `/dashboard` | Dados agregados da tela inicial |
 
 **Avaliação física**
@@ -466,7 +468,7 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | **2 — Usuários e segurança** ✅ | IDs UUID; refresh token com rotação; logout; recuperação e troca de senha (Mailpit); perfil e configurações (unidades, tema); exclusão de conta; `CurrentUser` e base de isolamento; Testcontainers | Autenticação, rotação/reuso de refresh, isolamento |
 | **3 — Catálogo e planejamento** ✅ | Seed de exercícios; exercícios personalizados; planos, fases, semanas, dias, exercícios planejados; reordenar, substituir e duplicar; telas de planejamento | Criação, duplicação, isolamento |
 | **4 — Execução** ✅ | Sessões com snapshot; registro de séries (tipos e status); pular/substituir; observações; cronômetro; recuperação de sessão; fila offline; tela mobile | Início/fim, séries, sessão incompleta, recuperação |
-| **5 — Evolução e progressão** | Histórico por exercício; gráficos; volume por grupo muscular; análise de progressão com regras configuráveis | Cálculo de volume e de progressão (casos de borda) |
+| **5 — Evolução e progressão** ✅ | Histórico por exercício; gráficos; volume por grupo muscular; análise de progressão com regras configuráveis | Cálculo de volume e de progressão (casos de borda) |
 | **6 — Avaliação física** | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
 | **7 — Relatórios** | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
 | **8 — Dashboard e refinamento** | Dashboard com indicadores e gráficos; ajustes de usabilidade; testes de integração ponta a ponta; documentação final | Integração geral |
@@ -493,6 +495,14 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 - Cronômetro de descanso no app: guarda o horário de término, então sobrevive a recarregar a página; som (opcional, pela preferência) e vibração ao terminar.
 - Observações: região e lado do corpo só para dor/desconforto (regra no backend e `CHECK` no banco); observação geral exige texto. Elas podem ser da sessão, de um exercício da sessão ou avulsas.
 - Navegação inferior: **Início · Histórico · Treinar · Mais**. Avaliação física entra na Etapa 6.
+
+**Decisões de implementação da Etapa 5** (sem mudar nenhuma das ambiguidades A1–A14):
+
+- Só sessões **finalizadas** entram na evolução; cada exercício do catálogo tem um equipamento, então cargas de equipamentos diferentes nunca são comparadas.
+- **Tendência** (`ProgressionAnalyzer`, único lugar das regras): compara a última execução completa com a anterior, fora as semanas de deload. Maior carga → em progresso; mesma carga → média de reps nas séries com a maior carga (mais = progresso, igual = estável, menos = queda); carga menor → queda. Se a faixa de reps mudou (nova fase), compara pelo 1RM estimado (Epley, ±2%). Execução incompleta (menos séries que o planejado, série interrompida/não feita, pulado ou substituído) → "incompleto", nunca "queda".
+- **Sugestão** (dupla progressão, A12): todas as séries válidas no teto da faixa, RIR ≥ mínimo (regra ou RIR alvo do plano) e N sessões seguidas no teto com a mesma carga → "avaliar aumento" de +2,5 kg (ou o incremento da regra). Dor no exercício, ou desconforto com intensidade ≥ 5 ou que interrompeu, suspende a sugestão. Queda gera "rever recuperação", sem mudar nada no plano.
+- Volume: séries válidas contam para o grupo principal do exercício e, à parte, para os secundários (sem pesos fracionados); volume de carga = kg × reps das séries válidas mais drop sets e rest-pause (A13). Semanas de segunda a domingo no fuso do usuário.
+- Gráficos com **Chart.js 4** (dependência prevista para esta etapa).
 
 **Dependências novas propostas** (todas compatíveis com Java 17):
 

@@ -29,6 +29,19 @@ public interface WorkoutObservationRepository extends Repository<WorkoutObservat
     Page<WorkoutObservation> findPeriod(
             @Param("userId") UUID userId, @Param("from") Instant from, @Param("to") Instant to, Pageable pageable);
 
+    /** Dor e desconforto registrados nas sessões informadas. */
+    @Query("""
+            select o from WorkoutObservation o
+            where o.userId = :userId and o.sessionId in :sessionIds
+              and o.category in (com.gymwork.api.workout.ObservationCategory.PAIN,
+                                 com.gymwork.api.workout.ObservationCategory.DISCOMFORT)
+            """)
+    List<WorkoutObservation> findBodyRelatedInSessions(
+            @Param("userId") UUID userId, @Param("sessionIds") java.util.Collection<UUID> sessionIds);
+
+    /** Histórico de observações ligadas a um exercício (mais recentes primeiro). */
+    List<WorkoutObservation> findTop20ByUserIdAndExerciseIdOrderByObservedAtDesc(UUID userId, UUID exerciseId);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from WorkoutObservation o where o.userId = :userId")
     void deleteAllByUserId(@Param("userId") UUID userId);

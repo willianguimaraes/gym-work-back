@@ -70,6 +70,51 @@ public interface SessionExerciseRepository extends Repository<SessionExercise, U
             """)
     List<Object[]> countBySession(@Param("sessionIds") Collection<UUID> sessionIds);
 
+    // ------------------------------------------------------------- evolução (sessões finalizadas)
+
+    @Query(value = """
+            select e from SessionExercise e join fetch e.session s
+            where e.userId = :userId and e.exercise.id = :exerciseId
+              and s.status = com.gymwork.api.workout.SessionStatus.COMPLETED
+            order by s.startedAt desc, e.position
+            """,
+            countQuery = """
+            select count(e) from SessionExercise e
+            where e.userId = :userId and e.exercise.id = :exerciseId
+              and e.session.status = com.gymwork.api.workout.SessionStatus.COMPLETED
+            """)
+    org.springframework.data.domain.Page<SessionExercise> findCompletedByExercise(
+            @Param("userId") UUID userId,
+            @Param("exerciseId") UUID exerciseId,
+            org.springframework.data.domain.Pageable pageable);
+
+    @Query("""
+            select e from SessionExercise e join fetch e.session s
+            where e.userId = :userId and e.exercise.id = :exerciseId
+              and s.status = com.gymwork.api.workout.SessionStatus.COMPLETED
+            order by s.startedAt, e.position
+            """)
+    List<SessionExercise> findAllCompletedByExercise(@Param("userId") UUID userId, @Param("exerciseId") UUID exerciseId);
+
+    @Query("""
+            select e from SessionExercise e join fetch e.session s join fetch e.exercise
+            where e.userId = :userId
+              and s.status = com.gymwork.api.workout.SessionStatus.COMPLETED
+              and s.startedAt >= :from and s.startedAt < :to
+            order by s.startedAt, e.position
+            """)
+    List<SessionExercise> findCompletedBetween(
+            @Param("userId") UUID userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("""
+            select e from SessionExercise e join fetch e.session s join fetch e.exercise
+            where e.userId = :userId
+              and s.status = com.gymwork.api.workout.SessionStatus.COMPLETED
+              and s.phaseId = :phaseId
+            order by s.startedAt, e.position
+            """)
+    List<SessionExercise> findCompletedInPhase(@Param("userId") UUID userId, @Param("phaseId") UUID phaseId);
+
     @Query("select e from SessionExercise e join fetch e.session where e.id in :ids")
     List<SessionExercise> findWithSession(@Param("ids") Collection<UUID> ids);
 }
