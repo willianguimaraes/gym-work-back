@@ -31,6 +31,12 @@ public interface WorkoutSessionRepository extends Repository<WorkoutSession, UUI
     Page<WorkoutSession> findHistory(
             @Param("userId") UUID userId, @Param("from") Instant from, @Param("to") Instant to, Pageable pageable);
 
+    /** Sessões de uma semana do plano (relatórios), em ordem cronológica. */
+    List<WorkoutSession> findByUserIdAndWeekIdOrderByStartedAtAsc(UUID userId, UUID weekId);
+
+    /** Sessões de uma fase do plano (relatórios), em ordem cronológica. */
+    List<WorkoutSession> findByUserIdAndPhaseIdOrderByStartedAtAsc(UUID userId, UUID phaseId);
+
     /** Último início por dia de treino: linhas [dayId, startedAt]. */
     @Query("""
             select s.workoutDayId, max(s.startedAt) from WorkoutSession s

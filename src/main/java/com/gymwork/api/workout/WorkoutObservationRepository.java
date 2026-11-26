@@ -39,6 +39,10 @@ public interface WorkoutObservationRepository extends Repository<WorkoutObservat
     List<WorkoutObservation> findBodyRelatedInSessions(
             @Param("userId") UUID userId, @Param("sessionIds") java.util.Collection<UUID> sessionIds);
 
+    /** Todas as observações das sessões informadas (relatórios), em ordem. */
+    List<WorkoutObservation> findByUserIdAndSessionIdInOrderByObservedAtAsc(
+            UUID userId, java.util.Collection<UUID> sessionIds);
+
     /** Histórico de observações ligadas a um exercício (mais recentes primeiro). */
     List<WorkoutObservation> findTop20ByUserIdAndExerciseIdOrderByObservedAtDesc(UUID userId, UUID exerciseId);
 

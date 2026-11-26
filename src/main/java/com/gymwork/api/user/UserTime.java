@@ -32,6 +32,12 @@ public class UserTime {
         }
     }
 
+    /** Unidade de peso preferida (relatórios em texto); o banco guarda sempre em kg. */
+    @Transactional(readOnly = true)
+    public WeightUnit weightUnit(UUID userId) {
+        return profileRepository.findById(userId).map(UserProfile::getWeightUnit).orElse(WeightUnit.KG);
+    }
+
     /** "Hoje" no fuso do usuário. */
     public LocalDate today(UUID userId) {
         return LocalDate.now(clock.withZone(zone(userId)));

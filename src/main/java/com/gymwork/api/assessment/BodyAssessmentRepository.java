@@ -31,6 +31,17 @@ public interface BodyAssessmentRepository extends Repository<BodyAssessment, UUI
             """)
     List<BodyAssessment> findAllChronological(@Param("userId") UUID userId);
 
+    /** Avaliações num intervalo de datas (inclusive), mais antigas primeiro. */
+    @Query("""
+            select a from BodyAssessment a
+            where a.userId = :userId and a.assessedOn >= :from and a.assessedOn <= :to
+            order by a.assessedOn, a.createdAt
+            """)
+    List<BodyAssessment> findBetween(
+            @Param("userId") UUID userId,
+            @Param("from") java.time.LocalDate from,
+            @Param("to") java.time.LocalDate to);
+
     /** Apaga uma avaliação; o banco apaga medidas e fotos (registros) em cascata. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from BodyAssessment a where a.id = :id and a.userId = :userId")

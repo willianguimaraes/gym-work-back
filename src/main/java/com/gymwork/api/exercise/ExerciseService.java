@@ -81,6 +81,12 @@ public class ExerciseService {
         return ExerciseResponse.from(exercise);
     }
 
+    /** Catálogo utilizável pelo usuário (globais e personalizados ativos). */
+    @Transactional(readOnly = true)
+    public List<Exercise> usableCatalog(UUID userId) {
+        return exerciseRepository.findUsable(userId);
+    }
+
     /**
      * Exercício que o usuário pode colocar num plano: global ou dele, e ativo. Usado pelo
      * planejamento para nunca aceitar o exercício personalizado de outro usuário.

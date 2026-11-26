@@ -115,6 +115,15 @@ public interface SessionExerciseRepository extends Repository<SessionExercise, U
             """)
     List<SessionExercise> findCompletedInPhase(@Param("userId") UUID userId, @Param("phaseId") UUID phaseId);
 
+    /** Exercícios das sessões informadas (relatórios), na ordem da sessão. */
+    @Query("""
+            select e from SessionExercise e join fetch e.session s join fetch e.exercise
+            where s.id in :sessionIds and e.userId = :userId
+            order by s.startedAt, e.position, e.id
+            """)
+    List<SessionExercise> findBySessions(
+            @Param("sessionIds") Collection<UUID> sessionIds, @Param("userId") UUID userId);
+
     @Query("select e from SessionExercise e join fetch e.session where e.id in :ids")
     List<SessionExercise> findWithSession(@Param("ids") Collection<UUID> ids);
 }

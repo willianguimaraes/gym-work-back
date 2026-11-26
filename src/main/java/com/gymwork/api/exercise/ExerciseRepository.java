@@ -27,6 +27,14 @@ public interface ExerciseRepository extends JpaRepository<Exercise, UUID>, JpaSp
     List<Exercise> findSameName(
             @Param("userId") UUID userId, @Param("name") String name, @Param("equipment") Equipment equipment);
 
+    /** Catálogo utilizável pelo usuário (globais e personalizados ativos), por grupo e nome. */
+    @Query("""
+            select e from Exercise e
+            where e.active = true and (e.ownerId is null or e.ownerId = :userId)
+            order by e.primaryMuscleGroup, e.name
+            """)
+    List<Exercise> findUsable(@Param("userId") UUID userId);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Exercise e where e.ownerId = :ownerId")
     void deleteAllByOwnerId(@Param("ownerId") UUID ownerId);

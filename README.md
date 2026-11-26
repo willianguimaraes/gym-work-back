@@ -13,6 +13,7 @@ O frontend fica em [gym-work-front](https://github.com/willianguimaraes/gym-work
 | JWT | Spring Security OAuth2 Resource Server (Nimbus, HS256) |
 | Banco | PostgreSQL 17 + Flyway |
 | Documentação | springdoc-openapi 3.2.1 (Swagger UI) |
+| PDF | OpenPDF 2.0.5 (relatórios) |
 | Testes | JUnit Jupiter + Mockito |
 | Build | Maven 3.9 (wrapper incluso) |
 
@@ -140,8 +141,14 @@ Lista completa em [`.env.example`](.env.example).
 | GET | `/api/files/{token}` | URL assinada | Entrega a foto (link válido por 5 minutos) |
 | GET / POST | `/api/observations` | JWT | Observações (dor, desconforto, sono, energia…) |
 | PUT / DELETE | `/api/observations/{id}` | JWT | Edita / remove observação |
+| GET | `/api/reports/sessions/{id}`, `/weeks/{id}`, `/phases/{id}` | JWT | Relatório em texto (`format=text\|csv\|pdf`; `download=true` baixa o .txt) |
+| GET | `/api/reports/{sessions\|weeks\|phases}/{id}/analysis` | JWT | Resumo de análise (evoluíram, mantiveram, caíram, faltas, desconfortos, volume) |
+| GET | `/api/reports/phases/{id}/ai-package?format=md\|json` | JWT | Pacote para IA da fase |
+| GET | `/api/plans/{id}/template`, `/api/phases/{id}/template` | JWT | Planejamento no template `gymwork.plan/v1` (JSON) |
 
-Recursos de outro usuário respondem **404** (nunca 403), para não revelar que o ID existe. Cargas são sempre em kg.
+Recursos de outro usuário respondem **404** (nunca 403), para não revelar que o ID existe. Cargas são sempre em kg (só o texto e o PDF dos relatórios usam a unidade do perfil).
+
+O formato dos relatórios, o template `gymwork.plan/v1` e o pacote para IA estão descritos na seção 11 de [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 Erros seguem o padrão RFC 9457 (`application/problem+json`); erros ligados a campos trazem um mapa `errors` por campo.
 

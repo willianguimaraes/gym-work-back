@@ -134,7 +134,16 @@ public class AssessmentService {
     /** Valores informados em cada avaliação, da mais antiga para a mais recente. */
     @Transactional(readOnly = true)
     public List<TrendPoint> trend(UUID userId) {
-        List<BodyAssessment> assessments = assessmentRepository.findAllChronological(userId);
+        return points(userId, assessmentRepository.findAllChronological(userId));
+    }
+
+    /** Avaliações entre duas datas (inclusive), mais antigas primeiro (relatórios e pacote para IA). */
+    @Transactional(readOnly = true)
+    public List<TrendPoint> between(UUID userId, java.time.LocalDate from, java.time.LocalDate to) {
+        return points(userId, assessmentRepository.findBetween(userId, from, to));
+    }
+
+    private List<TrendPoint> points(UUID userId, List<BodyAssessment> assessments) {
         if (assessments.isEmpty()) {
             return List.of();
         }

@@ -58,6 +58,10 @@ public class TrainingReader {
     public record DayRef(UUID id, String name, DayOfWeek dayOfWeek, int position, int exercisesCount) {
     }
 
+    /** Fase com o plano a que pertence (relatórios e pacote para IA). */
+    public record PhaseDetails(PhaseRef phase, String notes, UUID planId, String planName, PlanGoal planGoal) {
+    }
+
     /** Exercício planejado pronto para virar exercício da sessão. */
     public record PlannedItem(
             UUID plannedExerciseId,
@@ -106,6 +110,28 @@ public class TrainingReader {
     @Transactional(readOnly = true)
     public PhaseRef phase(UUID userId, UUID phaseId) {
         return phaseRef(lookup.phase(userId, phaseId));
+    }
+
+    @Transactional(readOnly = true)
+    public PhaseDetails phaseDetails(UUID userId, UUID phaseId) {
+        TrainingPhase phase = lookup.phase(userId, phaseId);
+        TrainingPlan plan = phase.getPlan();
+        return new PhaseDetails(phaseRef(phase), phase.getNotes(), plan.getId(), plan.getName(), plan.getGoal());
+    }
+
+    /** Semana do usuário (404 se não for dele). */
+    @Transactional(readOnly = true)
+    public WeekRef week(UUID userId, UUID weekId) {
+        return weekRef(lookup.week(userId, weekId));
+    }
+
+    /** Semanas da fase, em ordem. */
+    @Transactional(readOnly = true)
+    public List<WeekRef> weeks(UUID userId, UUID phaseId) {
+        return weekRepository.findByPhase(phaseId, userId).stream()
+                .map(TrainingReader::weekRef)
+                .sorted(java.util.Comparator.comparingInt(WeekRef::weekNumber))
+                .toList();
     }
 
     @Transactional(readOnly = true)

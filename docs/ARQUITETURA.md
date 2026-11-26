@@ -346,6 +346,9 @@ Prefixo `/api`. Todos exigem JWT, exceto os marcados com 🔓. Listagens são pa
 | GET | `/reports/weeks/{id}` | Texto da semana |
 | GET | `/reports/phases/{id}` | Texto da fase |
 | GET | `/reports/{tipo}/{id}/analysis` | Resumo estruturado (JSON) |
+| GET | `/reports/phases/{id}/ai-package` | Pacote para IA (`?format=md|json`) — adicionado na Etapa 7 |
+| GET | `/plans/{id}/template` | Planejamento no template `gymwork.plan/v1` — adicionado na Etapa 7 |
+| GET | `/phases/{id}/template` | Uma fase no template — adicionado na Etapa 7 |
 
 Os relatórios de texto respondem `text/plain` (copiar) ou, com `?download=true`, como arquivo `.txt`. PDF e CSV entram como novos formatos da mesma rota (`?format=pdf|csv`), reutilizando o mesmo modelo de dados do relatório.
 
@@ -472,7 +475,7 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | **4 — Execução** ✅ | Sessões com snapshot; registro de séries (tipos e status); pular/substituir; observações; cronômetro; recuperação de sessão; fila offline; tela mobile | Início/fim, séries, sessão incompleta, recuperação |
 | **5 — Evolução e progressão** ✅ | Histórico por exercício; gráficos; volume por grupo muscular; análise de progressão com regras configuráveis | Cálculo de volume e de progressão (casos de borda) |
 | **6 — Avaliação física** ✅ | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
-| **7 — Relatórios** | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
+| **7 — Relatórios** ✅ | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
 | **8 — Dashboard e refinamento** | Dashboard com indicadores e gráficos; ajustes de usabilidade; testes de integração ponta a ponta; documentação final | Integração geral |
 | **9 — Importação de planejamento** | Template de planejamento (formato a definir); validação com pré-visualização; criação do plano a partir do arquivo (seção 11) | Validação do template, importação, isolamento |
 
@@ -517,6 +520,17 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 - Registro rápido de peso (A6) = avaliação só com o peso. A data não pode estar no futuro (fuso do usuário).
 - Navegação inferior completa: **Início · Histórico · Treinar · Avaliação · Mais**.
 
+**Decisões de implementação da Etapa 7** (sem mudar nenhuma das ambiguidades A1–A14; formato aprovado antes da implementação):
+
+- **Um modelo, vários formatos:** `ReportLoader` monta o relatório (sessão, semana ou fase) só com dados registrados; texto, PDF, CSV, análise e pacote para IA saem dele.
+- **Texto no formato da seção 5:** mesma carga → `45 kg | 8/8/7/6`; cargas diferentes → `45 kg | 8/8 · 40 kg | 7/6`; série não feita → `x` (inclusive as planejadas que não chegaram a ser registradas, depois de finalizada a sessão); pulado → `não realizado`; substituição → `Remada baixa → Remada articulada: …`; drop set e rest-pause → `8+4`; sem carga → só as repetições. Aquecimento e ativação ficam fora. O peso da semana vem da avaliação mais recente dentro dela (A6) e some se não houver.
+- **Dias da semana:** os dias planejados aparecem na ordem do plano; um dia sem sessão vira "Não realizado" só depois que a data dele passou (semana em andamento não acusa falta). Sessões fora do plano da fase entram no fim da semana. O relatório da fase lista as semanas já iniciadas ou com treino.
+- **Cargas no texto e no PDF** seguem a unidade do perfil (kg ou lb); **CSV e pacote para IA usam sempre kg**. CSV com `;`, vírgula decimal e BOM UTF-8 (abre direto no Excel em português), uma linha por série, com proteção contra fórmulas.
+- **PDF** com OpenPDF 2.0.5 (a última linha compilada para Java 17) e fontes padrão do PDF; a seta da substituição vira `->`.
+- **Análise:** usa as regras da Etapa 5. O histórico considerado é o da fase até o fim do período (ou as últimas 26 semanas em treino avulso). Para cada exercício, compara a primeira e a última execução do período (ou a anterior ao período, se houver só uma).
+- **Template `gymwork.plan/v1`** e **pacote `gymwork.ai-package/v1`** conforme a seção 11. Avaliações físicas do pacote incluem as feitas até 14 dias antes do início da fase, como referência.
+- Telas: **Mais → Relatórios** (planejamento, fases e semanas), menu da sessão ("Relatório"), menu da fase ("Relatório da fase", "Pacote para IA") e do planejamento ("Exportar (JSON)").
+
 **Dependências novas propostas** (todas compatíveis com Java 17):
 
 | Onde | Biblioteca | Para quê | Etapa |
@@ -525,13 +539,13 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | Backend | `spring-boot-starter-mail` | Recuperação de senha | 2 |
 | Docker | Mailpit | Captura de e-mails em dev | 2 |
 | Frontend | Biblioteca de gráficos (ECharts ou Chart.js) | Gráficos de evolução | 5 |
-| Backend | OpenPDF | Exportação PDF | 7 |
+| Backend | OpenPDF 2.0.5 | Exportação PDF | 7 |
 
 ---
 
 ## 11. Ciclo com IA: exportar evolução e importar o próximo planejamento
 
-> Requisito incluído depois da primeira versão deste documento. Detalhes (formato e template) serão definidos antes das etapas 7 e 9.
+> Requisito incluído depois da primeira versão deste documento. O formato abaixo foi aprovado antes da Etapa 7 e já está implementado na exportação; a importação (Etapa 9) usa o mesmo template, começando só por JSON.
 
 **Objetivo:** quando uma fase estiver terminando, exportar tudo o que aconteceu para uma IA (ou treinador) avaliar a evolução e montar o próximo treino; depois, importar esse novo treino no sistema sem cadastrar tudo à mão.
 
@@ -562,9 +576,31 @@ Assim, o que sai do sistema e o que volta para ele falam a mesma língua, e a va
 - Formatos candidatos: texto/Markdown (para colar no chat da IA) e JSON (mais preciso).
 
 **Importação de planejamento** (Etapa 9):
-- Formato a decidir: **JSON** (mais fácil para a IA gerar sem erro) e/ou **planilha** (mais fácil de editar à mão).
+- Formato decidido: **JSON no template `gymwork.plan/v1`** (o mesmo da exportação). A planilha pode vir depois, com as mesmas colunas.
 - Fluxo: enviar arquivo → validar → **pré-visualizar** o plano montado e os problemas encontrados → confirmar.
 - Exercícios citados pelo nome são casados com o catálogo; os não encontrados aparecem na pré-visualização para o usuário escolher um existente ou criar um personalizado.
 - Nunca altera planos existentes: a importação sempre cria um plano ou fase nova (rascunho).
+
+**Template `gymwork.plan/v1`** (cargas em kg; exercícios pelo nome do catálogo; campos sem valor = `null`; limites iguais aos do cadastro manual: séries 1–20, reps 1–100 com `repsMin ≤ repsMax`, descanso 0–900 s, RIR 0–10, semanas 1–52):
+
+```json
+{
+  "format": "gymwork.plan/v1",
+  "plan": { "name": "Hipertrofia 2027", "goal": "HYPERTROPHY", "notes": null },
+  "phases": [{
+    "name": "Fase 5 — Volume", "weeks": 8, "deloadWeeks": [8], "notes": null,
+    "days": [{
+      "name": "UPPER", "dayOfWeek": "MONDAY", "notes": null,
+      "exercises": [{
+        "exercise": "Supino inclinado máquina",
+        "sets": 4, "repsMin": 6, "repsMax": 10,
+        "restSeconds": 120, "targetRir": 2, "suggestedLoadKg": 45, "notes": null
+      }]
+    }]
+  }]
+}
+```
+
+**Pacote para IA** (`/reports/phases/{id}/ai-package`): Markdown para colar no chat (ou JSON `gymwork.ai-package/v1` com os mesmos dados), com 1. instruções, 2. contexto, 3. plano atual no template e a descrição dos campos, 4. execução semana a semana no formato de texto, 5. análise, 6. desconfortos e observações, 7. avaliações físicas (tabela e diferença entre a primeira e a última), 8. nomes do catálogo agrupados por músculo.
 
 **Impacto no que vem antes:** o modelo de planejamento da Etapa 3 já é desenhado pensando nesse template (nomes estáveis de campos, enums documentados), para que a exportação e a importação não exijam mudanças no banco depois.
