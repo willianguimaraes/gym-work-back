@@ -70,6 +70,8 @@ Lista completa em [`.env.example`](.env.example).
 | `MAIL_HOST` / `MAIL_PORT` | Mailpit (`localhost:1025`) | sim |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | — | sim |
 | `MAIL_FROM` | `Gym Work <no-reply@gymwork.local>` | não |
+| `STORAGE_DIR` | `./data/uploads` | sim (pasta privada das fotos) |
+| `STORAGE_URL_SECRET` | segredo de dev | sim (mínimo 32 caracteres aleatórios) |
 
 ## Autenticação
 
@@ -128,6 +130,14 @@ Lista completa em [`.env.example`](.env.example).
 | GET / PUT / DELETE | `/api/exercises/{id}/progression-rule` | JWT | Regra de progressão do exercício (DELETE volta ao padrão) |
 | GET | `/api/progression?phaseId=&weeks=` | JWT | Análise de progressão de todos os exercícios |
 | GET | `/api/progression/volume?weeks=` | JWT | Séries por grupo muscular e frequência semanal |
+| GET / POST | `/api/assessments` | JWT | Avaliações físicas (só a data é obrigatória; só o peso = registro rápido) |
+| GET / PUT / DELETE | `/api/assessments/{id}` | JWT | Detalhe com medidas e fotos / edita / exclui |
+| GET | `/api/assessments/compare?a=&b=` | JWT | Comparativo entre duas avaliações |
+| GET | `/api/assessments/trend` | JWT | Peso, gordura e medidas para gráficos |
+| POST | `/api/assessments/{id}/photos?position=` | JWT | Envia foto (multipart `file`; JPEG/PNG/WebP, até 10 MB) |
+| GET | `/api/photos/{id}/url` | JWT | Nova URL temporária da foto |
+| PATCH / DELETE | `/api/photos/{id}` | JWT | Muda a posição / exclui a foto |
+| GET | `/api/files/{token}` | URL assinada | Entrega a foto (link válido por 5 minutos) |
 | GET / POST | `/api/observations` | JWT | Observações (dor, desconforto, sono, energia…) |
 | PUT / DELETE | `/api/observations/{id}` | JWT | Edita / remove observação |
 

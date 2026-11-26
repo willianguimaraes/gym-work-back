@@ -16,6 +16,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -62,6 +64,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleDataIntegrity(DataIntegrityViolationException ex) {
         log.warn("Violação de integridade: {}", ex.getMostSpecificCause().getMessage());
         return problem(HttpStatus.CONFLICT, "A operação conflita com dados existentes. Recarregue e tente novamente.");
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail body = problem(HttpStatus.PAYLOAD_TOO_LARGE, "O arquivo pode ter no máximo 10 MB");
+        body.setProperty("errors", Map.of("file", "O arquivo pode ter no máximo 10 MB"));
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(body);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestPart(
+            MissingServletRequestPartException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail body = problem(HttpStatus.BAD_REQUEST, "Envie o arquivo");
+        body.setProperty("errors", Map.of(ex.getRequestPartName(), "Envie o arquivo"));
+        return ResponseEntity.badRequest().body(body);
     }
 
     @Override

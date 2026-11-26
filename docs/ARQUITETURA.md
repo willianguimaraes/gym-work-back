@@ -331,6 +331,8 @@ Prefixo `/api`. Todos exigem JWT, exceto os marcados com 🔓. Listagens são pa
 | GET / POST | `/assessments` | Listar / criar (medidas inclusas) |
 | GET / PUT / DELETE | `/assessments/{id}` | |
 | GET | `/assessments/compare?a=&b=` | Comparativo entre duas datas |
+| GET | `/assessments/trend` | Peso, gordura e medidas para gráficos (adicionado na Etapa 6) |
+| PATCH | `/photos/{id}` | Muda a posição da foto (adicionado na Etapa 6) |
 | POST | `/assessments/{id}/photos` | Upload (multipart; JPEG/PNG/WebP, até 10 MB) |
 | GET | `/photos/{id}/url` | URL assinada temporária |
 | GET 🔓 | `/files/{token}` | Entrega o arquivo se a assinatura for válida |
@@ -469,7 +471,7 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | **3 — Catálogo e planejamento** ✅ | Seed de exercícios; exercícios personalizados; planos, fases, semanas, dias, exercícios planejados; reordenar, substituir e duplicar; telas de planejamento | Criação, duplicação, isolamento |
 | **4 — Execução** ✅ | Sessões com snapshot; registro de séries (tipos e status); pular/substituir; observações; cronômetro; recuperação de sessão; fila offline; tela mobile | Início/fim, séries, sessão incompleta, recuperação |
 | **5 — Evolução e progressão** ✅ | Histórico por exercício; gráficos; volume por grupo muscular; análise de progressão com regras configuráveis | Cálculo de volume e de progressão (casos de borda) |
-| **6 — Avaliação física** | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
+| **6 — Avaliação física** ✅ | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
 | **7 — Relatórios** | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
 | **8 — Dashboard e refinamento** | Dashboard com indicadores e gráficos; ajustes de usabilidade; testes de integração ponta a ponta; documentação final | Integração geral |
 | **9 — Importação de planejamento** | Template de planejamento (formato a definir); validação com pré-visualização; criação do plano a partir do arquivo (seção 11) | Validação do template, importação, isolamento |
@@ -503,6 +505,17 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 - **Sugestão** (dupla progressão, A12): todas as séries válidas no teto da faixa, RIR ≥ mínimo (regra ou RIR alvo do plano) e N sessões seguidas no teto com a mesma carga → "avaliar aumento" de +2,5 kg (ou o incremento da regra). Dor no exercício, ou desconforto com intensidade ≥ 5 ou que interrompeu, suspende a sugestão. Queda gera "rever recuperação", sem mudar nada no plano.
 - Volume: séries válidas contam para o grupo principal do exercício e, à parte, para os secundários (sem pesos fracionados); volume de carga = kg × reps das séries válidas mais drop sets e rest-pause (A13). Semanas de segunda a domingo no fuso do usuário.
 - Gráficos com **Chart.js 4** (dependência prevista para esta etapa).
+
+**Decisões de implementação da Etapa 6** (sem mudar nenhuma das ambiguidades A1–A14):
+
+- **Storage:** `StorageService` com implementação em disco (`STORAGE_DIR`, fora de qualquer pasta servida). A chave do arquivo é aleatória (`photos/{uuid}.jpg`), sem o ID do usuário. Trocar por S3 é uma nova implementação da interface.
+- **URL assinada:** `/api/files/{token}`, com token = chave + vencimento assinados com HMAC-SHA256 (`STORAGE_URL_SECRET`), válido por 5 minutos. A resposta de cada foto já traz a URL; o app pede outra se ela vencer. Token inválido, vencido ou de arquivo apagado → 404.
+- **Validação do arquivo:** tipo real pelos primeiros bytes (JPEG, PNG ou WebP), até 10 MB e até 12 fotos por avaliação. Nome e Content-Type enviados são ignorados.
+- **Privacidade:** o app reduz a foto (máx. 1600 px) e a regrava em JPEG antes do envio, o que remove os metadados EXIF, inclusive a localização GPS. Uploads feitos direto na API (fora do app) guardam o arquivo como veio.
+- **Arquivos e banco coerentes:** arquivos de registros apagados somem só depois do commit; um arquivo gravado numa transação que falhou é removido no rollback. A exclusão de conta apaga os arquivos.
+- **Comparativo:** a diferença só aparece quando o valor existe nas duas avaliações; nada é estimado (sem IMC ou valores derivados). As fotos são pareadas por posição.
+- Registro rápido de peso (A6) = avaliação só com o peso. A data não pode estar no futuro (fuso do usuário).
+- Navegação inferior completa: **Início · Histórico · Treinar · Avaliação · Mais**.
 
 **Dependências novas propostas** (todas compatíveis com Java 17):
 

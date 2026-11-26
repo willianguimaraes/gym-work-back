@@ -27,7 +27,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(properties = {
     "spring.datasource.url=jdbc:tc:postgresql:17-alpine:///gymwork",
     "spring.datasource.driver-class-name=org.testcontainers.jdbc.ContainerDatabaseDriver",
-    "app.auth.refresh-reuse-grace=PT0S"
+    "app.auth.refresh-reuse-grace=PT0S",
+    "app.storage.local-dir=${java.io.tmpdir}/gymwork-test-uploads"
 })
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
