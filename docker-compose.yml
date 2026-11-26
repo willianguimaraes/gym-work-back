@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: gymwork-postgres
+    environment:
+      POSTGRES_DB: gymwork
+      POSTGRES_USER: gymwork
+      POSTGRES_PASSWORD: gymwork
+    ports:
+      - "5432:5432"
+    volumes:
+      - gymwork-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gymwork -d gymwork"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  gymwork-pgdata:
