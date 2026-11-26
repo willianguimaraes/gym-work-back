@@ -50,9 +50,9 @@ O `docker-compose.yml` sobe o PostgreSQL em `localhost:5432` (banco, usuário e 
 ./mvnw test
 ```
 
-- **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha e conta.
+- **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha, conta, catálogo e planejamento (ativação, semanas, reordenação).
 - **Controller** (`@WebMvcTest`): validação, códigos HTTP e cookies.
-- **Integração** (Testcontainers + PostgreSQL 17): fluxos completos contra banco real. **Precisam do Docker rodando**; sem Docker eles são pulados (aparecem como *skipped*).
+- **Integração** (Testcontainers + PostgreSQL 17): fluxos completos contra banco real, incluindo o isolamento entre usuários em todos os endpoints de planejamento e a FK composta que impede, no banco, um registro filho apontar para o pai de outro usuário. **Precisam do Docker rodando**; sem Docker eles são pulados (aparecem como *skipped*).
 
 ## Variáveis de ambiente
 
@@ -91,6 +91,28 @@ Lista completa em [`.env.example`](.env.example).
 | GET / PUT | `/api/me/settings` | JWT | Unidades, tema, descanso padrão, som, fuso horário |
 | PUT | `/api/me/password` | JWT | Troca a senha (pede a atual) |
 | DELETE | `/api/me` | JWT | Exclui a conta e todos os dados (pede a senha) |
+| GET | `/api/muscle-groups` | JWT | Grupos musculares |
+| GET | `/api/exercises?search=&muscleGroup=&equipment=&scope=ALL\|GLOBAL\|MINE&includeInactive=&page=&size=` | JWT | Busca no catálogo (sem acento, por palavras), paginada |
+| GET | `/api/exercises/{id}` | JWT | Detalhe do exercício |
+| POST / PUT | `/api/exercises`, `/api/exercises/{id}` | JWT | Cria / edita exercício personalizado |
+| PATCH | `/api/exercises/{id}/active` | JWT | Desativa ou reativa exercício personalizado |
+| GET / POST | `/api/plans` | JWT | Lista / cria planejamentos |
+| GET / PUT / DELETE | `/api/plans/{id}` | JWT | Detalhe com fases / edita (inclui status) / exclui |
+| POST | `/api/plans/{id}/activate` | JWT | Torna ativo (o anterior vira concluído) |
+| POST | `/api/plans/{id}/duplicate` | JWT | Duplica como rascunho |
+| POST | `/api/plans/{id}/phases` | JWT | Cria fase (gera as semanas) |
+| GET / PUT / DELETE | `/api/phases/{id}` | JWT | Detalhe com semanas, dias e exercícios / edita / exclui |
+| POST | `/api/phases/{id}/duplicate` | JWT | Nova fase a partir desta |
+| PUT | `/api/weeks/{id}` | JWT | Deload e observações da semana |
+| POST | `/api/phases/{id}/days` | JWT | Cria dia de treino |
+| PUT | `/api/phases/{id}/days/order` | JWT | Reordena os dias |
+| GET / PUT / DELETE | `/api/days/{id}` | JWT | Dia com exercícios / edita / exclui |
+| POST | `/api/days/{id}/exercises` | JWT | Adiciona exercício ao dia |
+| PUT | `/api/days/{id}/exercises/order` | JWT | Reordena os exercícios |
+| PUT / DELETE | `/api/planned-exercises/{id}` | JWT | Edita séries, reps, descanso, carga, RIR / remove |
+| POST | `/api/planned-exercises/{id}/replace` | JWT | Substitui o exercício mantendo a configuração |
+
+Recursos de outro usuário respondem **404** (nunca 403), para não revelar que o ID existe. Cargas são sempre em kg.
 
 Erros seguem o padrão RFC 9457 (`application/problem+json`); erros ligados a campos trazem um mapa `errors` por campo.
 

@@ -143,10 +143,10 @@ Todas as tabelas têm `id UUID` (gerado pela aplicação), `created_at` e `updat
 
 | Tabela | Campos principais | Observações |
 | --- | --- | --- |
-| `muscle_groups` | code, name | Tabela de referência (seed). Cumpre o papel de "ExerciseCategory". |
-| `exercises` | owner_id (nulo = global), name, primary_muscle_group_id, description, instructions, type (COMPOUND/ISOLATION), equipment (MACHINE, DUMBBELL, BARBELL, CABLE, SMITH, BODYWEIGHT, …), active | Único por (dono, nome, equipamento). Nunca é apagado se tiver histórico — só desativado. |
+| `muscle_groups` | code (PK), name, position | Tabela de referência (seed). Cumpre o papel de "ExerciseCategory". O código (CHEST, BACK…) é estável e serve para templates de importação. |
+| `exercises` | owner_id (nulo = global), name, search_name, primary_muscle_group, description, instructions, type (COMPOUND/ISOLATION), equipment (BARBELL, DUMBBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, KETTLEBELL, BAND, OTHER), active | Único por (dono, nome, equipamento), sem diferenciar maiúsculas. `search_name` é o nome sem acentos, para a busca. Não é apagado, só desativado. |
 | `exercise_secondary_muscles` | exercise_id, muscle_group_id | N:N. |
-| `progression_rules` | user_id, exercise_id, min_rir, sessions_at_top, load_increment_kg, enabled | Opcional; sem registro = regra padrão. |
+| `progression_rules` | user_id, exercise_id, min_rir, sessions_at_top, load_increment_kg, enabled | Opcional; sem registro = regra padrão. Criada na Etapa 5, junto com a análise de progressão. |
 
 **Planejamento** (o "plano")
 
@@ -281,6 +281,7 @@ Prefixo `/api`. Todos exigem JWT, exceto os marcados com 🔓. Listagens são pa
 | POST | `/plans/{id}/duplicate` | Duplica |
 | POST | `/plans/{id}/phases` | Cria fase (gera as semanas) |
 | GET / PUT / DELETE | `/phases/{id}` | Detalhe (dias, exercícios, semanas) / editar / excluir |
+| GET | `/days/{id}` | Dia com os exercícios (adicionado na Etapa 3) |
 | POST | `/phases/{id}/duplicate` | Cria nova fase a partir desta |
 | PUT | `/weeks/{id}` | Deload, observações |
 | POST | `/phases/{id}/days` | Cria dia de treino |
@@ -462,13 +463,23 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | --- | --- | --- |
 | **1 — Fundação** ✅ | Projetos, Docker, Flyway, Swagger, tema escuro | Build, lint, contexto |
 | **2 — Usuários e segurança** ✅ | IDs UUID; refresh token com rotação; logout; recuperação e troca de senha (Mailpit); perfil e configurações (unidades, tema); exclusão de conta; `CurrentUser` e base de isolamento; Testcontainers | Autenticação, rotação/reuso de refresh, isolamento |
-| **3 — Catálogo e planejamento** | Seed de exercícios; exercícios personalizados; planos, fases, semanas, dias, exercícios planejados; reordenar, substituir e duplicar; telas de planejamento | Criação, duplicação, isolamento |
+| **3 — Catálogo e planejamento** ✅ | Seed de exercícios; exercícios personalizados; planos, fases, semanas, dias, exercícios planejados; reordenar, substituir e duplicar; telas de planejamento | Criação, duplicação, isolamento |
 | **4 — Execução** | Sessões com snapshot; registro de séries (tipos e status); pular/substituir; observações; cronômetro; recuperação de sessão; fila offline; tela mobile | Início/fim, séries, sessão incompleta, recuperação |
 | **5 — Evolução e progressão** | Histórico por exercício; gráficos; volume por grupo muscular; análise de progressão com regras configuráveis | Cálculo de volume e de progressão (casos de borda) |
 | **6 — Avaliação física** | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
 | **7 — Relatórios** | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
 | **8 — Dashboard e refinamento** | Dashboard com indicadores e gráficos; ajustes de usabilidade; testes de integração ponta a ponta; documentação final | Integração geral |
 | **9 — Importação de planejamento** | Template de planejamento (formato a definir); validação com pré-visualização; criação do plano a partir do arquivo (seção 11) | Validação do template, importação, isolamento |
+
+**Decisões de implementação da Etapa 3** (sem mudar nenhuma das ambiguidades A1–A14):
+
+- Ao ativar um planejamento, o que estava ativo passa a **COMPLETED**. O status também pode ser trocado na edição (rascunho, concluído, arquivado).
+- Duplicar um planejamento cria um **rascunho sem datas**, com as mesmas fases, semanas (marcações de deload), dias e exercícios. "Criar fase a partir desta" adiciona a cópia no fim do mesmo planejamento.
+- Mudar a duração da fase cria ou remove semanas **no fim**. As datas das semanas são recalculadas a partir da data de início da fase (sem data de início, as semanas ficam sem data).
+- A reordenação recebe a lista completa de IDs na nova ordem. A API recusa uma lista com item faltando, repetido ou de outro dia/fase.
+- Foi adicionado `GET /days/{id}`, usado pela tela de configuração do dia.
+- A regra de progressão por exercício (`/exercises/{id}/progression-rule`) ficou para a Etapa 5, junto com a análise que a usa.
+- Navegação inferior por enquanto: **Início · Mais**. Histórico, Treinar e Avaliação entram nas etapas 4 a 6.
 
 **Dependências novas propostas** (todas compatíveis com Java 17):
 

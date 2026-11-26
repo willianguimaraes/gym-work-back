@@ -13,6 +13,9 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      # carrega coleções (ex.: músculos secundários) em lote, evitando N+1 nas listagens
+      hibernate.default_batch_fetch_size: 100
   flyway:
     enabled: true
     locations: classpath:db/migration

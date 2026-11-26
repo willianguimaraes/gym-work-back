@@ -2,6 +2,10 @@ package com.gymwork.api.common.exception;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -20,6 +24,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(EmailAlreadyInUseException.class)
     public ProblemDetail handleEmailInUse(EmailAlreadyInUseException ex) {
@@ -43,6 +49,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
         return problem(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    /** Duas edições simultâneas do mesmo registro (lock otimista pelo campo version). */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLock(OptimisticLockingFailureException ex) {
+        return problem(HttpStatus.CONFLICT, "Este registro foi alterado em outro lugar. Recarregue e tente novamente.");
+    }
+
+    /** Restrição do banco violada (ex.: corrida entre duas requisições). O detalhe não é exposto. */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Violação de integridade: {}", ex.getMostSpecificCause().getMessage());
+        return problem(HttpStatus.CONFLICT, "A operação conflita com dados existentes. Recarregue e tente novamente.");
     }
 
     @Override
