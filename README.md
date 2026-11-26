@@ -33,36 +33,66 @@ docker compose up -d
 - API: http://localhost:8080
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - Health check: http://localhost:8080/actuator/health
+- Mailpit (e-mails enviados em dev): http://localhost:8025
 
-O `docker-compose.yml` sobe o PostgreSQL em `localhost:5432` (banco, usuário e senha: `gymwork`, só para desenvolvimento). As tabelas são criadas pelo Flyway ao iniciar a API.
+O `docker-compose.yml` sobe o PostgreSQL em `localhost:5432` (banco, usuário e senha: `gymwork`, só para desenvolvimento) e o Mailpit, que captura os e-mails de recuperação de senha. As tabelas são criadas pelo Flyway ao iniciar a API.
 
-Testes:
+## Perfis
+
+| Perfil | Uso |
+| --- | --- |
+| `dev` (padrão) | Valores locais prontos: banco e Mailpit do Docker, segredo JWT de dev, cookie sem `Secure` (permite testar no celular via `http://<ip-do-pc>`). |
+| `prod` | `SPRING_PROFILES_ACTIVE=prod`. Exige as variáveis obrigatórias, cookie `Secure`, SMTP com autenticação e Swagger desligado. |
+
+## Testes
 
 ```bash
 ./mvnw test
 ```
 
+- **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha e conta.
+- **Controller** (`@WebMvcTest`): validação, códigos HTTP e cookies.
+- **Integração** (Testcontainers + PostgreSQL 17): fluxos completos contra banco real. **Precisam do Docker rodando**; sem Docker eles são pulados (aparecem como *skipped*).
+
 ## Variáveis de ambiente
 
-| Variável | Padrão |
-| --- | --- |
-| `DB_URL` | `jdbc:postgresql://localhost:5432/gymwork` |
-| `DB_USERNAME` | `gymwork` |
-| `DB_PASSWORD` | `gymwork` |
-| `JWT_SECRET` | segredo de desenvolvimento — **troque em produção** (mínimo 32 caracteres) |
-| `JWT_EXPIRATION` | `PT8H` |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` |
-| `SERVER_PORT` | `8080` |
+Lista completa em [`.env.example`](.env.example).
 
-## Endpoints atuais
+| Variável | Padrão (dev) | Obrigatória em prod |
+| --- | --- | --- |
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | banco do Docker | sim |
+| `JWT_SECRET` | segredo de dev | sim (mínimo 32 caracteres aleatórios) |
+| `JWT_EXPIRATION` | `PT15M` | não |
+| `REFRESH_TOKEN_TTL` | `P30D` | não |
+| `AUTH_COOKIE_SECURE` | `false` em dev, `true` em prod | — |
+| `FRONTEND_URL` | `http://localhost:5173` | sim (usada nos links dos e-mails) |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | sim |
+| `MAIL_HOST` / `MAIL_PORT` | Mailpit (`localhost:1025`) | sim |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | — | sim |
+| `MAIL_FROM` | `Gym Work <no-reply@gymwork.local>` | não |
+
+## Autenticação
+
+- **Token de acesso** (JWT, 15 min): vai no corpo do login e deve ser enviado em `Authorization: Bearer <token>`.
+- **Refresh token** (30 dias): vai **só** num cookie `gw_refresh` (`HttpOnly`, `SameSite=Strict`, `Path=/api/auth`). A cada `/api/auth/refresh` ele é trocado por um novo. Se um token já trocado for reapresentado, a sessão inteira é revogada (detecção de roubo), com tolerância de 10 s para duas abas renovando ao mesmo tempo.
+- Trocar ou redefinir a senha encerra todas as sessões.
+
+## Endpoints
 
 | Método | Rota | Auth | Descrição |
 | --- | --- | --- | --- |
-| POST | `/api/auth/register` | — | Cria conta e retorna o token |
-| POST | `/api/auth/login` | — | Autentica e retorna o token |
-| GET | `/api/users/me` | JWT | Dados do usuário autenticado |
+| POST | `/api/auth/register` | — | Cria conta e inicia a sessão |
+| POST | `/api/auth/login` | — | Autentica e inicia a sessão |
+| POST | `/api/auth/refresh` | cookie | Renova o token de acesso (rotaciona o cookie) |
+| POST | `/api/auth/logout` | cookie | Encerra a sessão atual |
+| POST | `/api/auth/forgot-password` | — | Envia link de redefinição (sempre 204) |
+| POST | `/api/auth/reset-password` | — | Define nova senha com o token do e-mail |
+| GET / PUT | `/api/me` | JWT | Perfil (nome, altura, data de nascimento) |
+| GET / PUT | `/api/me/settings` | JWT | Unidades, tema, descanso padrão, som, fuso horário |
+| PUT | `/api/me/password` | JWT | Troca a senha (pede a atual) |
+| DELETE | `/api/me` | JWT | Exclui a conta e todos os dados (pede a senha) |
 
-Envie o token no header `Authorization: Bearer <token>`. Erros seguem o padrão RFC 9457 (`application/problem+json`); erros de validação trazem um mapa `errors` por campo.
+Erros seguem o padrão RFC 9457 (`application/problem+json`); erros ligados a campos trazem um mapa `errors` por campo.
 
 ## Arquitetura
 

@@ -1,23 +1,13 @@
 package com.gymwork.api.user;
 
+import com.gymwork.api.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
 
 @Entity
 @Table(name = "users")
-public class User {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, length = 120)
-    private String name;
+public class User extends BaseEntity {
 
     @Column(nullable = false, unique = true, length = 160)
     private String email;
@@ -25,25 +15,25 @@ public class User {
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    @Column(nullable = false, length = 120)
+    private String name;
 
     protected User() {
     }
 
+    /** @param email já normalizado (minúsculo, sem espaços) */
     public User(String name, String email, String passwordHash) {
         this.name = name;
         this.email = email;
         this.passwordHash = passwordHash;
-        this.createdAt = Instant.now();
     }
 
-    public Long getId() {
-        return id;
+    public void rename(String name) {
+        this.name = name;
     }
 
-    public String getName() {
-        return name;
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public String getEmail() {
@@ -54,7 +44,7 @@ public class User {
         return passwordHash;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
+    public String getName() {
+        return name;
     }
 }

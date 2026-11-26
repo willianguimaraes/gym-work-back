@@ -1,4 +1,4 @@
-package com.gymwork.api.config;
+package com.gymwork.api.security;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

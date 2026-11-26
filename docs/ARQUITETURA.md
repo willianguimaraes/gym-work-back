@@ -233,6 +233,8 @@ sequenceDiagram
 - **Access token**: JWT HS256, 15 minutos, guardado só em memória. Ao recarregar a página, o frontend chama `/refresh` e recupera a sessão.
 - **Refresh token**: valor aleatório de 256 bits, guardado no banco como hash SHA-256, enviado em cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`. JavaScript não consegue lê-lo, o que protege contra XSS.
 - **Rotação e revogação**: cada uso gera um novo refresh. Reuso de um token antigo revoga a família inteira. Trocar a senha ou excluir a conta revoga todos os tokens do usuário.
+- **Várias abas** (definido na Etapa 2): o frontend serializa a renovação entre abas com a Web Locks API, e o backend tolera por 10 segundos o reuso de um token recém-trocado (responde 401 sem revogar a família). Fora dessa janela, reuso continua sendo tratado como roubo.
+- **Perfis** (definido na Etapa 2): `dev` (padrão, valores locais) e `prod` (exige variáveis de ambiente, cookie `Secure`, Swagger desligado).
 - **CSRF**: como o cookie só vai para `/api/auth/*` e é `SameSite=Strict`, e os demais endpoints usam header `Authorization`, não há superfície de CSRF. Em produção, frontend e API devem ficar no mesmo site (ex.: `app.dominio.com` e `api.dominio.com`).
 - **Recuperação de senha**: `forgot-password` sempre responde 204 (não revela se o e-mail existe) e envia um link com token de uso único.
 - **CORS** por ambiente via `CORS_ALLOWED_ORIGINS`, com `allowCredentials` para o cookie.
@@ -459,13 +461,14 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | Etapa | Entregas | Testes principais |
 | --- | --- | --- |
 | **1 — Fundação** ✅ | Projetos, Docker, Flyway, Swagger, tema escuro | Build, lint, contexto |
-| **2 — Usuários e segurança** | IDs UUID; refresh token com rotação; logout; recuperação e troca de senha (Mailpit); perfil e configurações (unidades, tema); exclusão de conta; `CurrentUser` e base de isolamento; Testcontainers | Autenticação, rotação/reuso de refresh, isolamento |
+| **2 — Usuários e segurança** ✅ | IDs UUID; refresh token com rotação; logout; recuperação e troca de senha (Mailpit); perfil e configurações (unidades, tema); exclusão de conta; `CurrentUser` e base de isolamento; Testcontainers | Autenticação, rotação/reuso de refresh, isolamento |
 | **3 — Catálogo e planejamento** | Seed de exercícios; exercícios personalizados; planos, fases, semanas, dias, exercícios planejados; reordenar, substituir e duplicar; telas de planejamento | Criação, duplicação, isolamento |
 | **4 — Execução** | Sessões com snapshot; registro de séries (tipos e status); pular/substituir; observações; cronômetro; recuperação de sessão; fila offline; tela mobile | Início/fim, séries, sessão incompleta, recuperação |
 | **5 — Evolução e progressão** | Histórico por exercício; gráficos; volume por grupo muscular; análise de progressão com regras configuráveis | Cálculo de volume e de progressão (casos de borda) |
 | **6 — Avaliação física** | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
-| **7 — Relatórios** | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV | Geração de texto (snapshot de saída), exportação |
+| **7 — Relatórios** | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
 | **8 — Dashboard e refinamento** | Dashboard com indicadores e gráficos; ajustes de usabilidade; testes de integração ponta a ponta; documentação final | Integração geral |
+| **9 — Importação de planejamento** | Template de planejamento (formato a definir); validação com pré-visualização; criação do plano a partir do arquivo (seção 11) | Validação do template, importação, isolamento |
 
 **Dependências novas propostas** (todas compatíveis com Java 17):
 
@@ -476,3 +479,45 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | Docker | Mailpit | Captura de e-mails em dev | 2 |
 | Frontend | Biblioteca de gráficos (ECharts ou Chart.js) | Gráficos de evolução | 5 |
 | Backend | OpenPDF | Exportação PDF | 7 |
+
+---
+
+## 11. Ciclo com IA: exportar evolução e importar o próximo planejamento
+
+> Requisito incluído depois da primeira versão deste documento. Detalhes (formato e template) serão definidos antes das etapas 7 e 9.
+
+**Objetivo:** quando uma fase estiver terminando, exportar tudo o que aconteceu para uma IA (ou treinador) avaliar a evolução e montar o próximo treino; depois, importar esse novo treino no sistema sem cadastrar tudo à mão.
+
+```mermaid
+flowchart LR
+    A["Fase quase no fim"] --> B["Exportar pacote para IA<br/>(plano + execução + análise + avaliações)"]
+    B --> C["IA / treinador<br/>avalia e gera o novo plano"]
+    C --> D["Arquivo no template<br/>de planejamento"]
+    D --> E["Importar<br/>(validação + pré-visualização)"]
+    E --> F["Novo planejamento / fase<br/>pronto para iniciar"]
+```
+
+**Ideia central — um único formato de planejamento.** O mesmo template serve para três coisas:
+
+1. **Exportar** o planejamento atual (parte do pacote para a IA, para ela entender o ponto de partida).
+2. **Instruir a IA**: o pacote leva o template e um exemplo, pedindo que a resposta venha nesse formato.
+3. **Importar** o plano devolvido pela IA.
+
+Assim, o que sai do sistema e o que volta para ele falam a mesma língua, e a validação da importação é a mesma regra usada no cadastro manual.
+
+**Pacote de exportação para IA** (Etapa 7):
+- Planejamento da fase (no template).
+- Execução semana a semana: cargas e repetições por série, séries não feitas, substituições.
+- Resumo de análise: exercícios que evoluíram, estagnaram ou caíram; volume por grupo muscular; frequência.
+- Observações de dor e desconforto, sono e energia.
+- Avaliações físicas do período (peso e medidas).
+- Um texto de instrução (prompt) explicando o objetivo e o formato de resposta esperado.
+- Formatos candidatos: texto/Markdown (para colar no chat da IA) e JSON (mais preciso).
+
+**Importação de planejamento** (Etapa 9):
+- Formato a decidir: **JSON** (mais fácil para a IA gerar sem erro) e/ou **planilha** (mais fácil de editar à mão).
+- Fluxo: enviar arquivo → validar → **pré-visualizar** o plano montado e os problemas encontrados → confirmar.
+- Exercícios citados pelo nome são casados com o catálogo; os não encontrados aparecem na pré-visualização para o usuário escolher um existente ou criar um personalizado.
+- Nunca altera planos existentes: a importação sempre cria um plano ou fase nova (rascunho).
+
+**Impacto no que vem antes:** o modelo de planejamento da Etapa 3 já é desenhado pensando nesse template (nomes estáveis de campos, enums documentados), para que a exportação e a importação não exijam mudanças no banco depois.

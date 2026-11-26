@@ -1,0 +1,23 @@
+# Produção: ative com SPRING_PROFILES_ACTIVE=prod.
+# Obrigatórias: DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET, FRONTEND_URL, CORS_ALLOWED_ORIGINS, MAIL_HOST.
+spring:
+  mail:
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+server:
+  # Respeita X-Forwarded-* quando a API roda atrás de proxy/load balancer
+  forward-headers-strategy: framework
+
+app:
+  auth:
+    cookie-secure: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

@@ -14,18 +14,30 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-/** Padroniza erros no formato RFC 9457 (application/problem+json). */
+/**
+ * Padroniza erros no formato RFC 9457 (application/problem+json). Erros ligados a campos trazem
+ * {@code errors: {campo: mensagem}}.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(EmailAlreadyInUseException.class)
     public ProblemDetail handleEmailInUse(EmailAlreadyInUseException ex) {
-        return problem(HttpStatus.CONFLICT, ex.getMessage());
+        ProblemDetail body = problem(HttpStatus.CONFLICT, ex.getMessage());
+        body.setProperty("errors", Map.of("email", ex.getMessage()));
+        return body;
     }
 
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
+    @ExceptionHandler({InvalidCredentialsException.class, AuthenticatedUserNotFoundException.class})
+    public ProblemDetail handleUnauthorized(RuntimeException ex) {
         return problem(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidFieldException.class)
+    public ProblemDetail handleInvalidField(InvalidFieldException ex) {
+        ProblemDetail body = problem(HttpStatus.BAD_REQUEST, ex.getMessage());
+        body.setProperty("errors", Map.of(ex.getField(), ex.getMessage()));
+        return body;
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -45,7 +57,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    private static ProblemDetail problem(HttpStatus status, String detail) {
+    public static ProblemDetail problem(HttpStatus status, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(status.getReasonPhrase());
         return problem;

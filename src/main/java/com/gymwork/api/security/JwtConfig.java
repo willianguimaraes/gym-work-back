@@ -1,10 +1,9 @@
-package com.gymwork.api.config;
+package com.gymwork.api.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -14,9 +13,8 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
-/** Emissão e validação de JWT assinados com HMAC-SHA256 (chave simétrica). */
+/** Emissão e validação de JWT de acesso assinados com HMAC-SHA256 (chave simétrica). */
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
 public class JwtConfig {
 
     private final SecretKey secretKey;
