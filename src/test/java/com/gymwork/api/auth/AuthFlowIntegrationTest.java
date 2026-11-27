@@ -115,6 +115,35 @@ class AuthFlowIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    void tooManyWrongPasswordsReturn429EvenWithTheRightPassword() throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        String ip = nextIp();
+        for (int i = 0; i < 10; i++) {
+            mvc.perform(post("/api/auth/login")
+                            .with(request -> {
+                                request.setRemoteAddr(ip);
+                                return request;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"%s\",\"password\":\"errada-123\"}".formatted(email)))
+                    .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(post("/api/auth/login")
+                        .with(request -> {
+                            request.setRemoteAddr(ip);
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, PASSWORD)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(jsonPath("$.detail").value(containsString("Muitas tentativas")));
+        // de outro IP a conta continua acessível
+        login(email, PASSWORD);
+    }
+
+    @Test
     void forgotPasswordForUnknownEmailReturnsSameResponseAndSendsNothing() throws Exception {
         String unknown = uniqueEmail();
 

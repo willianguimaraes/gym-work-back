@@ -41,7 +41,7 @@ Cada item tem uma proposta padrão. Se você concordar, siga com ela; se não, m
 | A8 | **Exclusão de conta** "respeitando integridade". | Exige a senha e confirmação explícita. Apaga **todos os dados do usuário** (treinos, avaliações, fotos no storage) numa única transação, em ordem controlada. Como os dados são só dele, não há o que preservar para terceiros. |
 | A9 | **Catálogo global de exercícios** — quem mantém? | Exercícios globais vêm de uma **migration de seed** (lista inicial ~60 exercícios). Por enquanto não há perfil de administrador; o usuário cria os exercícios personalizados dele. |
 | A10 | **Unidades** (kg/lb, cm/pol). | O banco guarda sempre **kg e cm**. A conversão é feita só na exibição, conforme a preferência do usuário. |
-| A11 | **Uso na academia sem internet** estável. | Cada série é salva no servidor assim que registrada. Se a rede cair, o frontend guarda a série numa **fila local** e reenvia ao reconectar. Não é um app offline completo (PWA) — isso pode vir na Etapa 8. |
+| A11 | **Uso na academia sem internet** estável. | Cada série é salva no servidor assim que registrada. Se a rede cair, o frontend guarda a série numa **fila local** e reenvia ao reconectar. Não é um app offline completo (PWA) — isso pode vir na Etapa 8. *(Feito na Etapa 8: o app instala no celular e abre sem internet; veja as decisões da Etapa 8.)* |
 | A12 | **Regras de progressão configuráveis.** | Regra padrão: **dupla progressão** (bater o teto da faixa em todas as séries válidas, com RIR ≥ alvo e sem dor registrada). O usuário pode ajustar por exercício: RIR mínimo, quantas sessões seguidas no teto e incremento de carga sugerido. |
 | A13 | **Drop set / rest-pause** contam como séries válidas? | Contam no **volume** como parte da série principal (não como séries extras) e **não entram** na análise de progressão de carga. Aquecimento e ativação não contam em nada. |
 | A14 | **Versão do JUnit.** O prompt pede JUnit 5; o Spring Boot 4 traz o JUnit **6**, que mantém a mesma API do 5. | Manter o Boot 4 com JUnit 6 (mesma escrita de testes). A alternativa seria o Boot 3.5, que já está sem suporte gratuito. |
@@ -322,7 +322,7 @@ Prefixo `/api`. Todos exigem JWT, exceto os marcados com 🔓. Listagens são pa
 | GET | `/progression?phaseId=&weeks=` | Exercícios em progresso, estáveis e em queda, com sugestão |
 | GET | `/progression/volume?weeks=` | Séries por grupo muscular e frequência por semana (adicionado na Etapa 5) |
 | GET / PUT / DELETE | `/exercises/{id}/progression-rule` | Regra de progressão (DELETE volta ao padrão) |
-| GET | `/dashboard` | Dados agregados da tela inicial |
+| GET | `/dashboard` | Dados agregados da tela inicial (implementado na Etapa 8) |
 
 **Avaliação física**
 
@@ -476,7 +476,7 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | **5 — Evolução e progressão** ✅ | Histórico por exercício; gráficos; volume por grupo muscular; análise de progressão com regras configuráveis | Cálculo de volume e de progressão (casos de borda) |
 | **6 — Avaliação física** ✅ | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
 | **7 — Relatórios** ✅ | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
-| **8 — Dashboard e refinamento** | Dashboard com indicadores e gráficos; ajustes de usabilidade; testes de integração ponta a ponta; documentação final | Integração geral |
+| **8 — Dashboard e refinamento** ✅ | Dashboard com indicadores e gráficos; ajustes de usabilidade; testes de integração ponta a ponta; documentação final | Integração geral |
 | **9 — Importação de planejamento** | Template de planejamento (formato a definir); validação com pré-visualização; criação do plano a partir do arquivo (seção 11) | Validação do template, importação, isolamento |
 
 **Decisões de implementação da Etapa 3** (sem mudar nenhuma das ambiguidades A1–A14):
@@ -495,7 +495,7 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 - Sem `weekId`, a semana é escolhida pela data de hoje no fuso do usuário (preferência do perfil), quando a fase tem data de início.
 - Status do exercício: PENDING/PARTIAL/DONE são calculados pelas séries válidas concluídas (trabalho e adicionais); drop set e rest-pause ficam presos à série principal e não contam como séries extras (A13); aquecimento e ativação não contam. Registrar uma série desfaz o "pular"; "substituído" é definitivo (o novo exercício entra logo depois com a mesma configuração).
 - Exercício que ficou sem séries numa sessão finalizada aparece como "não feito"; nenhuma série é criada automaticamente (ausência de registro ≠ série feita).
-- **Fila offline (A11):** cada série leva um `clientId` gerado no aparelho; reenviar o mesmo `clientId` devolve o registro existente. O app guarda a fila no navegador e reenvia quando a API volta (evento `online` e nova tentativa a cada 20 s). Ela cobre queda de rede com o app aberto; reabrir o app sem internet depende do modo offline completo (PWA), previsto para a Etapa 8.
+- **Fila offline (A11):** cada série leva um `clientId` gerado no aparelho; reenviar o mesmo `clientId` devolve o registro existente. O app guarda a fila no navegador e reenvia quando a API volta (evento `online` e nova tentativa a cada 20 s). Ela cobre queda de rede com o app aberto; reabrir o app sem internet depende do modo offline completo (PWA), feito na Etapa 8.
 - Os endpoints de série devolvem o exercício inteiro atualizado (séries e status), para a tela se atualizar com uma resposta só.
 - Cronômetro de descanso no app: guarda o horário de término, então sobrevive a recarregar a página; som (opcional, pela preferência) e vibração ao terminar.
 - Observações: região e lado do corpo só para dor/desconforto (regra no backend e `CHECK` no banco); observação geral exige texto. Elas podem ser da sessão, de um exercício da sessão ou avulsas.
@@ -531,6 +531,17 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 - **Template `gymwork.plan/v1`** e **pacote `gymwork.ai-package/v1`** conforme a seção 11. Avaliações físicas do pacote incluem as feitas até 14 dias antes do início da fase, como referência.
 - Telas: **Mais → Relatórios** (planejamento, fases e semanas), menu da sessão ("Relatório"), menu da fase ("Relatório da fase", "Pacote para IA") e do planejamento ("Exportar (JSON)").
 
+**Decisões de implementação da Etapa 8** (sem mudar nenhuma das ambiguidades A1–A14):
+
+- **Dashboard** (`GET /dashboard`): uma chamada só, montada com os serviços existentes (nenhuma regra nova). Ordem na tela: o treino de hoje (em andamento, ou o próximo, com botão para começar), plano/fase/semana, três indicadores (treinos na semana, peso com a diferença para o anterior, exercícios em progresso/estáveis/em queda), a lista por tendência, e os gráficos de carga, frequência, corpo (peso e medidas) e séries por grupo muscular, depois os últimos treinos e as observações recentes. Análise e volume das **últimas 8 semanas**.
+- **Próximo treino:** com dias da semana definidos no plano, o próximo dia agendado a partir de hoje (o de hoje, se ainda não foi feito); sem dias definidos, o dia seguinte ao último feito, em rodízio.
+- **Gráfico de carga:** os exercícios mais feitos no período; maior carga por sessão e 1RM estimado (só como indicador).
+- **PWA** (`vite-plugin-pwa`): instalável (manifesto, ícones) e abre sem internet. O service worker guarda só os arquivos do app; **a API nunca é cacheada** (dados pessoais e autenticação). Versão nova é avisada com "Atualizar", sem recarregar no meio de um treino.
+- **Abrir sem internet:** se a sessão não puder ser confirmada por falta de rede (e não por sessão inválida), o app entra em modo sem conexão com o último usuário (só nome e e-mail ficam no aparelho, nunca o token), usa as preferências salvas e o treino em andamento guardado, e reconecta sozinho (evento `online` e a cada 30 s). Começar um treino novo continua exigindo a API.
+- **Limite de tentativas** (`AuthRateLimiter`, em memória): login com 10 senhas erradas por conta e IP (50 por IP) a cada 15 min, recuperação de senha com 5 pedidos por e-mail e IP (20 por IP), cadastro com 30 por IP por hora. Responde **429** com `Retry-After`. Com várias instâncias da API, trocar por armazenamento compartilhado.
+- O "voltar" de um exercício aberto pela Evolução ou pelo Início volta para lá (antes ia para o catálogo).
+- **Testes:** jornada completa de ponta a ponta (cadastro → plano → treino com série reenviada → avaliação → relatórios → dashboard → exclusão da conta, conferindo no banco que nada do usuário sobrou); dashboard; próximo treino; limite de tentativas. No frontend, **Vitest** cobre unidades, erros de rede, nome dos downloads, a fila de séries offline e o modo sem conexão.
+
 **Dependências novas propostas** (todas compatíveis com Java 17):
 
 | Onde | Biblioteca | Para quê | Etapa |
@@ -540,6 +551,8 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | Docker | Mailpit | Captura de e-mails em dev | 2 |
 | Frontend | Biblioteca de gráficos (ECharts ou Chart.js) | Gráficos de evolução | 5 |
 | Backend | OpenPDF 2.0.5 | Exportação PDF | 7 |
+| Frontend | `vite-plugin-pwa` 2.0 | App instalável e offline (service worker) | 8 |
+| Frontend (teste) | Vitest 5.1 + jsdom | Testes unitários do frontend | 8 |
 
 ---
 

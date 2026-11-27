@@ -53,6 +53,8 @@ O `docker-compose.yml` sobe o PostgreSQL em `localhost:5432` (banco, usuário e 
 
 - **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha, conta, catálogo, planejamento (ativação, semanas, reordenação) execução (status do exercício, tipos de série) e análise de progressão (casos de borda: teto em uma série só, aquecimento, incompleto, dor, RIR, deload, regra configurável).
 - **Controller** (`@WebMvcTest`): validação, códigos HTTP e cookies.
+- **Relatórios e dashboard:** texto no formato exato (snapshot), CSV/PDF, análise, pacote para IA, próximo treino e limite de tentativas.
+- **Jornada completa** (`JourneyIntegrationTest`): do cadastro à exclusão da conta, conferindo no banco que nenhum dado do usuário sobra.
 - **Integração** (Testcontainers + PostgreSQL 17): fluxos completos contra banco real, incluindo o isolamento entre usuários em todos os endpoints de planejamento e a FK composta que impede, no banco, um registro filho apontar para o pai de outro usuário. **Precisam do Docker rodando**; sem Docker eles são pulados (aparecem como *skipped*).
 
 ## Variáveis de ambiente
@@ -79,6 +81,7 @@ Lista completa em [`.env.example`](.env.example).
 - **Token de acesso** (JWT, 15 min): vai no corpo do login e deve ser enviado em `Authorization: Bearer <token>`.
 - **Refresh token** (30 dias): vai **só** num cookie `gw_refresh` (`HttpOnly`, `SameSite=Strict`, `Path=/api/auth`). A cada `/api/auth/refresh` ele é trocado por um novo. Se um token já trocado for reapresentado, a sessão inteira é revogada (detecção de roubo), com tolerância de 10 s para duas abas renovando ao mesmo tempo.
 - Trocar ou redefinir a senha encerra todas as sessões.
+- **Limite de tentativas:** 10 senhas erradas por conta e IP em 15 minutos bloqueiam o login dessa conta naquele IP (429 com `Retry-After`); a recuperação de senha e o cadastro também têm limite por IP. Fica em memória: com várias instâncias, usar um armazenamento compartilhado.
 
 ## Endpoints
 
@@ -141,6 +144,7 @@ Lista completa em [`.env.example`](.env.example).
 | GET | `/api/files/{token}` | URL assinada | Entrega a foto (link válido por 5 minutos) |
 | GET / POST | `/api/observations` | JWT | Observações (dor, desconforto, sono, energia…) |
 | PUT / DELETE | `/api/observations/{id}` | JWT | Edita / remove observação |
+| GET | `/api/dashboard` | JWT | Tela inicial: plano, fase e semana atuais, próximo treino, últimos treinos, peso, frequência, tendências, séries por grupo e observações |
 | GET | `/api/reports/sessions/{id}`, `/weeks/{id}`, `/phases/{id}` | JWT | Relatório em texto (`format=text\|csv\|pdf`; `download=true` baixa o .txt) |
 | GET | `/api/reports/{sessions\|weeks\|phases}/{id}/analysis` | JWT | Resumo de análise (evoluíram, mantiveram, caíram, faltas, desconfortos, volume) |
 | GET | `/api/reports/phases/{id}/ai-package?format=md\|json` | JWT | Pacote para IA da fase |

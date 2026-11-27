@@ -119,6 +119,12 @@ public class TrainingReader {
         return new PhaseDetails(phaseRef(phase), phase.getNotes(), plan.getId(), plan.getName(), plan.getGoal());
     }
 
+    /** Objetivo do planejamento do usuário (404 se não for dele). */
+    @Transactional(readOnly = true)
+    public PlanGoal planGoal(UUID userId, UUID planId) {
+        return lookup.plan(userId, planId).getGoal();
+    }
+
     /** Semana do usuário (404 se não for dele). */
     @Transactional(readOnly = true)
     public WeekRef week(UUID userId, UUID weekId) {

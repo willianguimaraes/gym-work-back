@@ -8,6 +8,7 @@ import com.gymwork.api.security.RefreshTokenCookie;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -58,8 +59,21 @@ public abstract class IntegrationTest {
         return "user-" + UUID.randomUUID() + "@gym.test";
     }
 
+    private static final AtomicInteger NEXT_IP = new AtomicInteger();
+
+    /** IPs 10.0.x.y distintos para os cadastros de teste. */
+    protected static String nextIp() {
+        int n = NEXT_IP.incrementAndGet();
+        return "10.0." + (n / 250 % 250) + "." + (n % 250 + 1);
+    }
+
     protected Session register(String email) throws Exception {
         MvcResult result = mvc.perform(post("/api/auth/register")
+                        // cada cadastro vem de um IP diferente: o limite por IP (AuthRateLimiter) vale como em produção
+                        .with(request -> {
+                            request.setRemoteAddr(nextIp());
+                            return request;
+                        })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Atleta","email":"%s","password":"%s"}

@@ -8,6 +8,8 @@ import com.gymwork.api.auth.dto.ResetPasswordRequest;
 import com.gymwork.api.common.exception.GlobalExceptionHandler;
 import com.gymwork.api.common.exception.InvalidRefreshTokenException;
 import com.gymwork.api.security.RefreshTokenCookie;
+import com.gymwork.api.common.exception.InvalidCredentialsException;
+import jakarta.servlet.http.HttpServletRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -32,19 +34,26 @@ public class AuthController {
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
     private final RefreshTokenCookie refreshCookie;
+    private final AuthRateLimiter rateLimiter;
 
     public AuthController(
-            AuthService authService, PasswordResetService passwordResetService, RefreshTokenCookie refreshCookie) {
+            AuthService authService,
+            PasswordResetService passwordResetService,
+            RefreshTokenCookie refreshCookie,
+            AuthRateLimiter rateLimiter) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
         this.refreshCookie = refreshCookie;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/register")
     @Operation(summary = "Cria uma conta e inicia a sessão")
     public ResponseEntity<AuthResponse> register(
             @Valid @RequestBody RegisterRequest request,
-            @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+            @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
+            HttpServletRequest http) {
+        rateLimiter.register(http.getRemoteAddr());
         return withSession(HttpStatus.CREATED, authService.register(request, userAgent));
     }
 
@@ -52,8 +61,19 @@ public class AuthController {
     @Operation(summary = "Autentica e inicia a sessão")
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request,
-            @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
-        return withSession(HttpStatus.OK, authService.login(request, userAgent));
+            @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
+            HttpServletRequest http) {
+        String ip = http.getRemoteAddr();
+        rateLimiter.checkLogin(ip, request.email());
+        AuthResult result;
+        try {
+            result = authService.login(request, userAgent);
+        } catch (InvalidCredentialsException e) {
+            rateLimiter.loginFailed(ip, request.email());
+            throw e;
+        }
+        rateLimiter.loginSucceeded(ip, request.email());
+        return withSession(HttpStatus.OK, result);
     }
 
     @PostMapping("/refresh")
@@ -82,7 +102,8 @@ public class AuthController {
     @PostMapping("/forgot-password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Envia o link de redefinição de senha (sempre 204, exista o e-mail ou não)")
-    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest http) {
+        rateLimiter.passwordReset(http.getRemoteAddr(), request.email());
         passwordResetService.requestReset(request.email());
     }
 

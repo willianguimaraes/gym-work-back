@@ -45,6 +45,9 @@ class AuthControllerTest {
     @MockitoBean
     private PasswordResetService passwordResetService;
 
+    @MockitoBean
+    private AuthRateLimiter rateLimiter;
+
     @Test
     void registerReturns201WithAccessTokenInBodyAndRefreshTokenOnlyInHttpOnlyCookie() throws Exception {
         when(authService.register(any(), any())).thenReturn(result("novo-refresh"));
