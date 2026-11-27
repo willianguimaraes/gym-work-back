@@ -48,6 +48,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return body;
     }
 
+    @ExceptionHandler(InvalidFieldsException.class)
+    public ProblemDetail handleInvalidFields(InvalidFieldsException ex) {
+        ProblemDetail body = problem(HttpStatus.BAD_REQUEST, ex.getMessage());
+        body.setProperty("errors", new LinkedHashMap<>(ex.getErrors()));
+        return body;
+    }
+
     @ExceptionHandler(TooManyAttemptsException.class)
     public ResponseEntity<ProblemDetail> handleTooManyAttempts(TooManyAttemptsException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

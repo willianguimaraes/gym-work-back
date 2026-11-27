@@ -349,6 +349,8 @@ Prefixo `/api`. Todos exigem JWT, exceto os marcados com 🔓. Listagens são pa
 | GET | `/reports/phases/{id}/ai-package` | Pacote para IA (`?format=md|json`) — adicionado na Etapa 7 |
 | GET | `/plans/{id}/template` | Planejamento no template `gymwork.plan/v1` — adicionado na Etapa 7 |
 | GET | `/phases/{id}/template` | Uma fase no template — adicionado na Etapa 7 |
+| POST | `/plans/import/preview` | Valida o JSON `gymwork.plan/v1` e mostra o que será criado, sem gravar — Etapa 9 |
+| POST | `/plans/import` | Importa: novo planejamento em rascunho, ou fases no fim de `planId` — Etapa 9 |
 
 Os relatórios de texto respondem `text/plain` (copiar) ou, com `?download=true`, como arquivo `.txt`. PDF e CSV entram como novos formatos da mesma rota (`?format=pdf|csv`), reutilizando o mesmo modelo de dados do relatório.
 
@@ -477,7 +479,7 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 | **6 — Avaliação física** ✅ | Avaliações, medidas, fotos com storage privado e URL assinada, comparativos | Avaliações, upload (tipo/tamanho), acesso às fotos |
 | **7 — Relatórios** ✅ | Texto de sessão/semana/fase no formato exato; copiar e baixar TXT; resumo de análise; PDF e CSV; **pacote de exportação para IA** (seção 11) | Geração de texto (snapshot de saída), exportação |
 | **8 — Dashboard e refinamento** ✅ | Dashboard com indicadores e gráficos; ajustes de usabilidade; testes de integração ponta a ponta; documentação final | Integração geral |
-| **9 — Importação de planejamento** | Template de planejamento (formato a definir); validação com pré-visualização; criação do plano a partir do arquivo (seção 11) | Validação do template, importação, isolamento |
+| **9 — Importação de planejamento** ✅ | Importação do JSON `gymwork.plan/v1`; validação com pré-visualização; exercícios casados com o catálogo; criação do plano (ou de fases) a partir do arquivo (seção 11) | Validação do template, importação, isolamento |
 
 **Decisões de implementação da Etapa 3** (sem mudar nenhuma das ambiguidades A1–A14):
 
@@ -542,6 +544,16 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 - O "voltar" de um exercício aberto pela Evolução ou pelo Início volta para lá (antes ia para o catálogo).
 - **Testes:** jornada completa de ponta a ponta (cadastro → plano → treino com série reenviada → avaliação → relatórios → dashboard → exclusão da conta, conferindo no banco que nada do usuário sobrou); dashboard; próximo treino; limite de tentativas. No frontend, **Vitest** cobre unidades, erros de rede, nome dos downloads, a fila de séries offline e o modo sem conexão.
 
+**Decisões de implementação da Etapa 9** (sem mudar nenhuma das ambiguidades A1–A14; formato aprovado antes da Etapa 7):
+
+- **Entrada:** o texto do arquivo ou colado do chat (`content`), não um JSON já interpretado, para a API apontar erros de sintaxe com linha e coluna. Texto em volta e cercas ```` ```json ```` são ignorados. Também aceita números como texto (`"4"`), vírgula decimal (`"42,5"`), enums em minúsculas e dias da semana em português; carga com mais de 2 casas é arredondada (com aviso).
+- **Validação** (`PlanTemplateReader`, sem acessar o banco): os mesmos limites do cadastro manual, mais um teto por arquivo (12 fases, 14 dias por fase, 40 exercícios por dia, 200 mil caracteres). Todos os problemas voltam de uma vez, com o caminho no JSON e a localização em palavras ("Fase 1 › Dia 2 (LOWER) › Exercício 3"). Campos desconhecidos, dias sem exercício e deload repetido viram **avisos**, que não impedem a importação.
+- **Exercícios:** o nome é comparado com o catálogo do usuário (globais e personalizados ativos) sem acentos, maiúsculas ou espaços extras. Um igual → usado direto; mais de um (equipamentos diferentes) → o usuário escolhe; nenhum → até 5 parecidos (palavras em comum ou erro de digitação), busca no catálogo ou cadastro rápido de um personalizado. A escolha vai na confirmação (`exercises`: nome no arquivo → ID) e pode trocar também um nome que já tinha casado. Personalizados de outro usuário nunca aparecem nem são aceitos.
+- **Pré-visualizar e confirmar** usam a mesma análise; a confirmação valida tudo de novo e recusa (400, com os problemas) se algo estiver pendente.
+- **Destino:** por padrão, um **planejamento novo em rascunho**, sem datas. Com `planId`, as fases entram **no fim** daquele planejamento, e o nome e o objetivo do arquivo são ignorados (com aviso). Nada que já existe é alterado. O botão "Importar a resposta da IA", na aba Pacote para IA, já abre a importação apontando para o planejamento da fase.
+- Telas: **Planejamentos → Importar JSON**, menu do planejamento ("Importar fases (JSON)") e aba Pacote para IA do relatório da fase. Com erros, "Copiar problemas para a IA" monta um texto para colar no chat pedindo a correção.
+- **Testes:** leitura e validação do template (inclusive respostas típicas de chat e JSON quebrado), semelhança de nomes, e a importação de ponta a ponta (pré-visualização sem gravar, escolha de exercício, ida e volta exportar → importar, fases em plano existente, nome ambíguo, isolamento entre usuários).
+
 **Dependências novas propostas** (todas compatíveis com Java 17):
 
 | Onde | Biblioteca | Para quê | Etapa |
@@ -558,7 +570,7 @@ Cada etapa termina com: build e testes passando, verificação no navegador em t
 
 ## 11. Ciclo com IA: exportar evolução e importar o próximo planejamento
 
-> Requisito incluído depois da primeira versão deste documento. O formato abaixo foi aprovado antes da Etapa 7 e já está implementado na exportação; a importação (Etapa 9) usa o mesmo template, começando só por JSON.
+> Requisito incluído depois da primeira versão deste documento. O formato abaixo foi aprovado antes da Etapa 7. A exportação (Etapa 7) e a importação (Etapa 9) estão implementadas com o mesmo template, por enquanto só em JSON.
 
 **Objetivo:** quando uma fase estiver terminando, exportar tudo o que aconteceu para uma IA (ou treinador) avaliar a evolução e montar o próximo treino; depois, importar esse novo treino no sistema sem cadastrar tudo à mão.
 

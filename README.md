@@ -54,6 +54,7 @@ O `docker-compose.yml` sobe o PostgreSQL em `localhost:5432` (banco, usuário e 
 - **Unitários** (JUnit + Mockito): regras de autenticação, rotação de tokens, recuperação de senha, conta, catálogo, planejamento (ativação, semanas, reordenação) execução (status do exercício, tipos de série) e análise de progressão (casos de borda: teto em uma série só, aquecimento, incompleto, dor, RIR, deload, regra configurável).
 - **Controller** (`@WebMvcTest`): validação, códigos HTTP e cookies.
 - **Relatórios e dashboard:** texto no formato exato (snapshot), CSV/PDF, análise, pacote para IA, próximo treino e limite de tentativas.
+- **Importação de planejamento:** leitura e validação do template (respostas típicas de chat, JSON quebrado, limites), semelhança de nomes de exercícios e a importação de ponta a ponta, inclusive a ida e volta exportar → importar e o isolamento entre usuários.
 - **Jornada completa** (`JourneyIntegrationTest`): do cadastro à exclusão da conta, conferindo no banco que nenhum dado do usuário sobra.
 - **Integração** (Testcontainers + PostgreSQL 17): fluxos completos contra banco real, incluindo o isolamento entre usuários em todos os endpoints de planejamento e a FK composta que impede, no banco, um registro filho apontar para o pai de outro usuário. **Precisam do Docker rodando**; sem Docker eles são pulados (aparecem como *skipped*).
 
@@ -149,10 +150,12 @@ Lista completa em [`.env.example`](.env.example).
 | GET | `/api/reports/{sessions\|weeks\|phases}/{id}/analysis` | JWT | Resumo de análise (evoluíram, mantiveram, caíram, faltas, desconfortos, volume) |
 | GET | `/api/reports/phases/{id}/ai-package?format=md\|json` | JWT | Pacote para IA da fase |
 | GET | `/api/plans/{id}/template`, `/api/phases/{id}/template` | JWT | Planejamento no template `gymwork.plan/v1` (JSON) |
+| POST | `/api/plans/import/preview` | JWT | Valida um JSON `gymwork.plan/v1` (texto colado ou do arquivo) e mostra o que será criado, sem gravar |
+| POST | `/api/plans/import` | JWT | Importa: cria um planejamento em rascunho ou, com `planId`, adiciona as fases no fim dele |
 
 Recursos de outro usuário respondem **404** (nunca 403), para não revelar que o ID existe. Cargas são sempre em kg (só o texto e o PDF dos relatórios usam a unidade do perfil).
 
-O formato dos relatórios, o template `gymwork.plan/v1` e o pacote para IA estão descritos na seção 11 de [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+O formato dos relatórios, o template `gymwork.plan/v1` (exportação e importação) e o pacote para IA estão descritos na seção 11 de [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 Erros seguem o padrão RFC 9457 (`application/problem+json`); erros ligados a campos trazem um mapa `errors` por campo.
 
